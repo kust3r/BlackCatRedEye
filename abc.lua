@@ -28,7 +28,7 @@ local antoralib = {
         Version = "vai toma no cu redz9999"
     },
     Save = {
-        UISize = {422, 277},
+        UISize = {490, 300},
         TabSize = 135,
         Theme = "Classic"
     },
