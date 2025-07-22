@@ -1,98 +1,212 @@
--- MoonCat Library
-local antoralib = loadstring(game:HttpGet("https://raw.githubusercontent.com/kust3r/BlackCatRedEye/refs/heads/main/abc.lua"))()
+local antoralib = loadstring(game:HttpGet("https://raw.githubusercontent.com/K6ntra/test/main/MoonCatSource.lua"))()
 local Window = antoralib:MakeWindow({
-    Title = "Antora",
+    Title = "MoonCat",
     SubTitle = "",
     SaveFolder = "Stars.lua"
 })
 
 local Main = Window:MakeTab({"Main", "rbxassetid://18759129862"})
-Window:AddMinimizeButton({ Button = { Image = "rbxassetid://102148214469417", BackgroundTransparency = 1 } })
 
--- Utilitários Gerais
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:FindService("CoreGui")
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
+Window:AddMinimizeButton({
+    Button = { Image = "rbxassetid://102148214469417", BackgroundTransparency = 1 }
+})
 
--- Hooks e Proteções
-RunService.RenderStepped:Connect(function()
-    for _, c in next, getconnections(game:GetService("ScriptContext").Error) do c:Disable() end
-    for _, c in next, getconnections(game:GetService("LogService").MessageOut) do c:Disable() end
+-- <><><><><><><><><><><><><><><><><><><><><><><><><>--
+game:GetService("RunService").RenderStepped:Connect(function()
+  for _, Connection in next, getconnections(game:GetService("ScriptContext").Error) do
+    Connection:Disable()
+  end
+  
+  for _, Connection in next, getconnections(game:GetService("LogService").MessageOut) do
+    Connection:Disable()
+  end
 end)
 
--- Remotes Utilitários
-local function getRemoteTable()
-    local nevermore_modules = rawget(require(ReplicatedStorage.Framework.Nevermore), "_lookupTable")
-    local network = rawget(nevermore_modules, "Network")
-    local remotes_table = getupvalue(getsenv(network).GetEventHandler, 1)
-    local events_table = getupvalue(getsenv(network).GetFunctionHandler, 1)
-    local remotes = {}
-    table.foreach(remotes_table, function(i, v) if rawget(v, "Remote") then remotes[rawget(v, "Remote")] = i end end)
-    table.foreach(events_table, function(i, v) if rawget(v, "Remote") then remotes[rawget(v, "Remote")] = i end end)
-    return remotes
-end
+local remotes_list = {}
 
-local function getRemote(name)
-    local remotes = getRemoteTable()
-    for i, v in pairs(remotes) do if i.Name == name then return i end end
+for _, tbl in ipairs(getgc(true)) do
+    if typeof(tbl) == "table" and rawget(tbl, "Remote") then
+        remotes_list[tbl.Remote] = tbl.Name
+    end
 end
-
--- Proteção contra Kick
-local local_player = Players.LocalPlayer
+  
+local local_player = game:GetService("Players").LocalPlayer
 local kick_hook; kick_hook = hookmetamethod(game, "__namecall", newcclosure(function(...)
-    local args = {...}
-    local self = args[1]
-    local namecall_method = getnamecallmethod()
-    if not checkcaller() and self == local_player and namecall_method == "Kick" then return end
-    return kick_hook(...)
+  local args = {...}
+  local self = args[1]
+  local namecall_method = getnamecallmethod()
+  if not checkcaller() and self == local_player and namecall_method == "Kick" then
+    return
+  end
+  return kick_hook(...)
 end))
 
--- Proteção contra funções de punição
-for _, b in next, getgc(true) do
-    if typeof(b) == 'function' and getinfo(b).name == 'punish' then
-        replaceclosure(b, function() return wait(9e9); end)
+function getEvent(name)
+  for i, v in ipairs(game:GetService("ReplicatedStorage").Communication.Events:GetChildren()) do
+    if v.Name == name then
+      return v
     end
+  end
 end
 
--- Proteção contra LogKick e CreateAntiCheatNotification
-local old; old = hookmetamethod(game, "__namecall", function(self, ...)
-    if self.Name == "LogKick" or self.Name == "CreateAntiCheatNotification" then return end
-    return old(self, ...)
-end)
-
--- Proteção contra métodos de kick em tabelas
-for _, v in pairs(getgc(true)) do
-    if typeof(v) == "table" and rawget(v, "kick") then v.kick = function() return end end
-    if typeof(v) == 'table' and rawget(v, 'getIsBodyMoverCreatedByGame') then v.getIsBodyMoverCreatedByGame = function() return true end end
-    if typeof(v) == "table" and rawget(v, "randomDelayKick") then v.randomDelayKick = function() return wait(9e9) end end
+function getFunction(name)
+  for i, v in ipairs(game:GetService("ReplicatedStorage").Communication.Functions:GetChildren()) do
+    if v.Name == name then
+      return v
+    end
+  end
 end
 
--- Proteção contra alteração de WalkSpeed
-RunService.RenderStepped:Connect(function()
-    if Players.LocalPlayer.Character then
-        for _, v in pairs(getconnections(Players.LocalPlayer.Character.Humanoid:GetPropertyChangedSignal("WalkSpeed"))) do v:Disable() end
+local runService = game:GetService("RunService")
+local event = runService.RenderStepped:Connect(function()
+  if game:GetService("Players").LocalPlayer.Character then
+    for i, v in pairs(getconnections(game:GetService("Players").LocalPlayer.Character.Humanoid:GetPropertyChangedSignal("WalkSpeed"))) do
+      v:Disable()
     end
+  end
 end)
 
--- Seção Player
-local PlayerSection = Main:AddSection({"Player"})
-local HideToggle = Main:AddToggle({ Title = "Hide Name", Default = false })
+local Remotes = {}
+local NetworkEnvironment = getmenv(rawget(rawget(require(game.ReplicatedStorage.Framework.Nevermore), '_lookupTable'), 'Network'))
+local EventsTable = debug.getupvalue(NetworkEnvironment.GetEventHandler, 1)
+local FunctionsTable = debug.getupvalue(NetworkEnvironment.GetFunctionHandler, 1)
+
+local function AddRemotes(StorageTable)
+  for Name, Info in pairs(StorageTable) do
+    if rawget(Info, 'Remote') then
+      Remotes[rawget(Info, 'Remote')] = Name
+    end
+  end
+end
+AddRemotes(EventsTable)
+AddRemotes(FunctionsTable)
+
+local Index
+Index = hookmetamethod(game, '__index', function(Self, Key)
+  if checkcaller() and (Key == 'Name' or Key == 'name') and Remotes[Self] then
+    return Remotes[Self]
+  end
+
+  return Index(Self, Key)
+end)
+
+for a, b in next, getgc(true) do
+  if typeof(b) == 'function' then
+    if getinfo(b).name == 'punish' then
+      replaceclosure(b, function() return wait(9e9); end)
+    end
+  end
+end
+
+local old;
+old = hookmetamethod(game, "__namecall", function(self, ...)
+  local args = {...}
+  if self.Name == "LogKick" then 
+    return
+  end
+  return old(self, ...)
+end)
+
+local old;
+old = hookmetamethod(game, "__namecall", function(self, ...)
+  local args = {...}
+  if self.Name == "CreateAntiCheatNotification" then 
+    return
+  end
+  return old(self, ...)
+end)
+
+for i,v in pairs(getgc(true)) do
+    if typeof(v) == "table" and rawget(v, "kick") then
+        v.kick =  function()
+            return
+        end
+    end
+
+    if typeof(v) == 'table' and rawget(v, 'getIsBodyMoverCreatedByGame') then
+        v.getIsBodyMoverCreatedByGame = function()
+            return true
+        end
+   end
+   if typeof(v) == "table" and rawget(v, "randomDelayKick") then
+        v.randomDelayKick = function()
+            return wait(9e9)
+        end
+    end
+end
+-- <><><><><><><><><><><><><><><><><><><><><><><><><>--
+
+local Player = Main:AddSection({"Player"})
+
+local HideToggle = Main:AddToggle({
+    Title = "Hide Name",
+    Default = false
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local nevermore_modules = rawget(require(game.ReplicatedStorage.Framework.Nevermore), "_lookupTable")
+local network = rawget(nevermore_modules, "Network")
+local remotes_table = getupvalue(getsenv(network).GetEventHandler, 1)
+local events_table = getupvalue(getsenv(network).GetFunctionHandler, 1)
+local remotes = {}
 local hidename = false
-HideToggle:Callback(function(Value) hidename = Value end)
+
+table.foreach(remotes_table, function(i, v)
+    if rawget(v, "Remote") then
+        remotes[rawget(v, "Remote")] = i
+    end
+end)
+
+table.foreach(events_table, function(i, v)
+    if rawget(v, "Remote") then
+        remotes[rawget(v, "Remote")] = i
+    end
+end)
+
+local pog
+pog = hookmetamethod(game, "__index", function(self, key)
+    if (key == "Name" or key == "name") and remotes[self] then
+       return remotes[self]
+    end
+
+    return pog(self, key)
+end)
+
+local function getRemote(name)
+    for i, v in pairs(remotes) do
+        if i.Name == name then
+            return i
+        end
+    end
+end
+
+HideToggle:Callback(function(Value)
+    hidename = Value
+end)
+
 task.spawn(function()
     RunService.Stepped:Connect(function()
-        if hidename then getRemote("UpdateIsCrouching"):FireServer(true) else getRemote("UpdateIsCrouching"):FireServer(false) end
+        if hidename then
+            getRemote("UpdateIsCrouching"):FireServer(true)
+        else
+            getRemote("UpdateIsCrouching"):FireServer(false)
+        end
     end)
 end)
 
--- Seção Ragdoll, Stamina, Jump, Fall Damage, Dash, Jump Cooldown, Utilities
-local ToggleAntiRagdoll = Main:AddToggle({ Name = "No Ragdoll", Default = false })
+--[[
+Wall climb (retirado)
+]]
+
+local ToggleAntiRagdoll = Main:AddToggle({
+Name = "No Ragdoll",
+Default = false
+})
+     
 local originalToggleRagdoll = {}
 local ragdollTables = {}
+      
 local function cacheRagdollTables()
   ragdollTables = {}
   for _, v in pairs(getgc(true)) do
@@ -102,18 +216,35 @@ local function cacheRagdollTables()
     end
   end
 end
+
 ToggleAntiRagdoll:Callback(function(Value)
-  if #ragdollTables == 0 then cacheRagdollTables() end
+  if #ragdollTables == 0 then
+    cacheRagdollTables()
+  end
+  
   if Value then
-    for _, v in pairs(ragdollTables) do v.toggleRagdoll = function(a, b) return end end
+    for _, v in pairs(ragdollTables) do
+      v.toggleRagdoll = function(a, b)
+        return
+      end
+    end
   else
-    for _, v in pairs(ragdollTables) do if originalToggleRagdoll[v] then v.toggleRagdoll = originalToggleRagdoll[v] end end
+    for _, v in pairs(ragdollTables) do
+      if originalToggleRagdoll[v] then
+        v.toggleRagdoll = originalToggleRagdoll[v]
+      end
+    end
   end
 end)
 
-local ToggleInfStamina = Main:AddToggle({ Name = "Inf Stamina", Default = false })
+local ToggleInfStamina = Main:AddToggle({
+  Name = "Inf Stamina",
+  Default = false
+})
+
 local originalSetStamina = {}
 local staminaTables = {}
+
 local function cacheStaminaTables()
   staminaTables = {}
   for _, v in pairs(getgc(true)) do
@@ -123,8 +254,12 @@ local function cacheStaminaTables()
     end
   end
 end
+
 ToggleInfStamina:Callback(function(Value)
-  if #staminaTables == 0 then cacheStaminaTables() end
+  if #staminaTables == 0 then
+    cacheStaminaTables()
+  end
+
   if Value then
     for _, v in pairs(staminaTables) do
       v._setStamina = function(a, b)
@@ -133,14 +268,23 @@ ToggleInfStamina:Callback(function(Value)
       end
     end
   else
-    for _, v in pairs(staminaTables) do if originalSetStamina[v] then v._setStamina = originalSetStamina[v] end end
+    for _, v in pairs(staminaTables) do
+      if originalSetStamina[v] then
+        v._setStamina = originalSetStamina[v]
+      end
+    end
   end
 end)
 
-local ToggleUnlockJump = Main:AddToggle({ Name = "Unlock Jump", Default = false })
+local ToggleUnlockJump = Main:AddToggle({
+    Name = "Unlock Jump",
+    Default = false
+})
+
 local originalGetCanJump = {}
 local unlockJumpTables = {}
 local toggleActivated = false
+
 local function cacheUnlockJumpTables()
     unlockJumpTables = {}
     for i,v in pairs(getgc(true)) do
@@ -150,14 +294,18 @@ local function cacheUnlockJumpTables()
         end
     end
 end
+
 ToggleUnlockJump:Callback(function(Value)
     if not toggleActivated and #unlockJumpTables == 0 then
         cacheUnlockJumpTables()
     end
+
     if Value then
         toggleActivated = true
         for _, v in pairs(unlockJumpTables) do
-            v.getCanJump = function() return true end
+            v.getCanJump = function()
+                return true
+            end
         end
     else
         toggleActivated = false
@@ -169,9 +317,53 @@ ToggleUnlockJump:Callback(function(Value)
     end
 end)
 
-local ToggleNoFallDamage = Main:AddToggle({ Name = "No Fall Damage", Default = false })
+local ToggleNoFallDamage = Main:AddToggle({
+  Name = "No Fall Damage",
+  Default = false
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local nevermore_modules = rawget(require(game.ReplicatedStorage.Framework.Nevermore), "_lookupTable")
+local network = rawget(nevermore_modules, "Network")
+local remotes_table = getupvalue(getsenv(network).GetEventHandler, 1)
+local events_table = getupvalue(getsenv(network).GetFunctionHandler, 1)
+local remotes = {}
+
+getgenv().fallremote = nil
 local nofall = true
+
+table.foreach(remotes_table, function(i, v)
+    if rawget(v, "Remote") then
+        remotes[rawget(v, "Remote")] = i
+    end
+end)
+
+table.foreach(events_table, function(i, v)
+    if rawget(v, "Remote") then
+        remotes[rawget(v, "Remote")] = i
+    end
+end)
+
+local pog
+pog = hookmetamethod(game, "__index", function(self, key)
+    if (key == "Name" or key == "name") and remotes[self] then
+        return remotes[self]
+    end
+    return pog(self, key)
+end)
+
+local function getRemote(name)
+    for i, v in pairs(remotes) do
+        if i.Name == name then
+            return i
+        end
+    end
+end
+
 getgenv().fallremote = getRemote("TakeFallDamage")
+
 local methodHook
 methodHook = hookmetamethod(game, "__namecall", function(self, ...)
     if not checkcaller() and getnamecallmethod() == "FireServer" and nofall and self.Name == fallremote.Name then
@@ -179,11 +371,19 @@ methodHook = hookmetamethod(game, "__namecall", function(self, ...)
     end
     return methodHook(self, ...)
 end)
-ToggleNoFallDamage:Callback(function(Value) nofall = Value end)
 
-local ToggleNoDashCooldown = Main:AddToggle({ Name = "No Dash Cooldown", Default = false })
+ToggleNoFallDamage:Callback(function(Value)
+    nofall = Value
+end)
+
+local ToggleNoDashCooldown = Main:AddToggle({
+  Name = "No Dash Cooldown",
+  Default = false
+})
+
 local originalDashCooldown = {}
 local dashCooldownTables = {}
+
 local function cacheDashCooldownTables()
   dashCooldownTables = {}
   for _, v in pairs(getgc(true)) do
@@ -193,18 +393,33 @@ local function cacheDashCooldownTables()
     end
   end
 end
+
 ToggleNoDashCooldown:Callback(function(Value)
-  if #dashCooldownTables == 0 then cacheDashCooldownTables() end
+  if #dashCooldownTables == 0 then
+    cacheDashCooldownTables()
+  end
+
   if Value then
-    for _, v in pairs(dashCooldownTables) do v.DASH_COOLDOWN = 0 end
+    for _, v in pairs(dashCooldownTables) do
+      v.DASH_COOLDOWN = 0
+    end
   else
-    for _, v in pairs(dashCooldownTables) do if originalDashCooldown[v] then v.DASH_COOLDOWN = originalDashCooldown[v] end end
+    for _, v in pairs(dashCooldownTables) do
+      if originalDashCooldown[v] then
+        v.DASH_COOLDOWN = originalDashCooldown[v]
+      end
+    end
   end
 end)
 
-local ToggleNoJumpCooldown = Main:AddToggle({ Name = "No Jump Cooldown", Default = false })
+local ToggleNoJumpCooldown = Main:AddToggle({
+  Name = "No Jump Cooldown",
+  Default = false
+})
+
 local originalJumpCooldown = {}
 local jumpCooldownTables = {}
+
 local function cacheJumpCooldownTables()
   jumpCooldownTables = {}
   for _, v in pairs(getgc(true)) do
@@ -214,18 +429,36 @@ local function cacheJumpCooldownTables()
     end
   end
 end
+
 ToggleNoJumpCooldown:Callback(function(Value)
-  if #jumpCooldownTables == 0 then cacheJumpCooldownTables() end
+  if #jumpCooldownTables == 0 then
+    cacheJumpCooldownTables()
+  end
+
   if Value then
-    for _, v in pairs(jumpCooldownTables) do v.JUMP_DELAY_ADD = 0 end
+    for _, v in pairs(jumpCooldownTables) do
+      v.JUMP_DELAY_ADD = 0
+    end
   else
-    for _, v in pairs(jumpCooldownTables) do if originalJumpCooldown[v] then v.JUMP_DELAY_ADD = originalJumpCooldown[v] end end
+    for _, v in pairs(jumpCooldownTables) do
+      if originalJumpCooldown[v] then
+        v.JUMP_DELAY_ADD = originalJumpCooldown[v]
+      end
+    end
   end
 end)
 
-local ToggleAntiUtilitiesDamage = Main:AddToggle({ Name = "No Utilities Damage", Default = false })
+local ToggleAntiUtilitiesDamage = Main:AddToggle({
+  Name = "No Utilities Damage",
+  Default = false
+})
+
 local UtilidadesSemDano = false
-ToggleAntiUtilitiesDamage:Callback(function(Value) UtilidadesSemDano = Value end)
+
+ToggleAntiUtilitiesDamage:Callback(function(Value)
+  UtilidadesSemDano = Value
+end)
+
 local old
 old = hookmetamethod(game, "__namecall", function(self, ...)
   local args = {...}
@@ -235,9 +468,13 @@ old = hookmetamethod(game, "__namecall", function(self, ...)
   return old(self, ...)
 end)
 
--- Seção Visual (ESP, Highlight, Tracers)
 local Visual = Main:AddSection({"Visual"})
-local PlayerHighlightToggle = Main:AddToggle({ Name = "ESP Highlight", Default = false })
+
+local PlayerHighlightToggle = Main:AddToggle({
+    Name = "ESP Highlight",
+    Default = false
+})
+
 local function SetupPlayerHighlight()
     local FillColor = Color3.fromRGB(115,112,178)
     local DepthMode = "AlwaysOnTop"
@@ -255,7 +492,9 @@ local function SetupPlayerHighlight()
     Storage.Name = "Highlight_Storage"
 
     local function Highlight(plr)
-        if plr == lp then return end
+        if plr == lp then
+            return
+        end
 
         local Highlight = Instance.new("Highlight")
         Highlight.Name = plr.Name
@@ -291,6 +530,7 @@ local function SetupPlayerHighlight()
         end
     end)
 end
+
 PlayerHighlightToggle:Callback(function(Value)
     if Value then
         SetupPlayerHighlight()
@@ -303,8 +543,13 @@ PlayerHighlightToggle:Callback(function(Value)
     end
 end)
 
-local ToggleESPName = Main:AddToggle({ Name = "ESP Name", Default = false })
+local ToggleESPName = Main:AddToggle({
+    Name = "ESP Name",
+    Default = false
+})
+
 local maxDistance = 400
+
 local function applyESPName()
     _G.FriendColor = Color3.fromRGB(0, 0, 255)
     _G.EnemyColor = Color3.fromRGB(255, 0, 0)
@@ -339,6 +584,7 @@ local function applyESPName()
     Tag.Font = Enum.Font.SourceSansBold
     Tag.TextScaled = false
 
+    local TweenService = game:GetService("TweenService")
     local function createGradientTween(textLabel)
         local function tweenColor(startColor, endColor)
             local goal = {TextColor3 = endColor}
@@ -443,6 +689,7 @@ local function applyESPName()
         pcall(UnloadPlayer, v)
     end)
 end
+
 ToggleESPName:Callback(function(Value)
     if Value then
         applyESPName()
@@ -455,9 +702,15 @@ ToggleESPName:Callback(function(Value)
 end)
 
 local tracerThickness = 0.1
-local ToggleESPTracers = Main:AddToggle({ Name = "ESP Tracers", Default = false })
+
+local ToggleESPTracers = Main:AddToggle({
+    Name = "ESP Tracers",
+    Default = false
+})
+
 local playerTracers = {}
 local tracerConnection
+
 local function applyESPTracers()
     local lpr = game.Players.LocalPlayer
     local camera = game:GetService("Workspace").CurrentCamera
@@ -535,6 +788,7 @@ local function applyESPTracers()
         end
     end)
 end
+
 ToggleESPTracers:Callback(function(Value)
     if Value then
         applyESPTracers()
@@ -542,9 +796,11 @@ ToggleESPTracers:Callback(function(Value)
         if tracerConnection then
             tracerConnection:Disconnect()
         end
+
         for _, tracer in pairs(playerTracers) do
             tracer:Remove()
         end
+
         playerTracers = {}
     end
 end)
@@ -561,8 +817,9 @@ local Slider = Main:AddSlider({
     end
 })
 
--- Seção Combat (Silent Aim, Wallbang, Auto Play, No Spread, No Recoil)
 local Combat = Main:AddSection({"Combat"})
+
+--<><><><><><><><><><><><><><<><><><><><><><><><><>--
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local remotes = {}
@@ -755,7 +1012,11 @@ player.CharacterAdded:Connect(function(character)
     end
 end)
 
-local SilentCrlh = Main:AddToggle({ Name = "Silent Aim", Default = false })
+local SilentCrlh = Main:AddToggle({
+    Name = "Silent Aim",
+    Default = false
+})
+
 SilentCrlh:Callback(function(Value)
     silentaim = Value
     if silentaim then
@@ -770,7 +1031,10 @@ local Dropdown = Main:AddDropdown({
     Options = {"Torso", "Head", "Random"},
     Default = "Random"
 })
-Dropdown:Callback(function(Value) hitpart = Value end)
+
+Dropdown:Callback(function(Value)
+    hitpart = Value
+end)
 
 local AimRangeSlider = Main:AddSlider({
     Name = "Aim Range",
@@ -785,11 +1049,24 @@ local AimRangeSlider = Main:AddSlider({
     end
 })
 
-local FriendsCheckToggle = Main:AddToggle({ Name = "Friends Check", Default = false })
-FriendsCheckToggle:Callback(function(Value) friendsCheck = Value end)
+local FriendsCheckToggle = Main:AddToggle({
+    Name = "Friends Check",
+    Default = false
+})
 
-local WallCheckToggle = Main:AddToggle({ Name = "Wall Check", Default = false })
-WallCheckToggle:Callback(function(Value) wallcheck = Value end)
+FriendsCheckToggle:Callback(function(Value)
+    friendsCheck = Value
+end)
+
+local WallCheckToggle = Main:AddToggle({
+    Name = "Wall Check",
+    Default = false
+})
+
+WallCheckToggle:Callback(function(Value)
+    wallcheck = Value
+end)
+--<><><><><><><><><><><><><><<><><><><><><><><><><>--
 
 local WallbangEnabled = false
 Main:AddToggle({
@@ -811,6 +1088,7 @@ Main:AddToggle({
 
 local AutoPlayEnabled = false
 local autoSpawnRunning = false
+
 local function AutoSpawnScript()
     local Players = game:GetService("Players")
     local Player = Players.LocalPlayer
@@ -831,7 +1109,11 @@ local function AutoSpawnScript()
     end
 end
 
-local AutoPlayToggle = Main:AddToggle({ Name = "Auto Play", Default = false })
+local AutoPlayToggle = Main:AddToggle({
+    Name = "Auto Play",
+    Default = false
+})
+
 AutoPlayToggle:Callback(function(isEnabled)
     autoSpawnRunning = isEnabled
     if isEnabled then
@@ -841,6 +1123,7 @@ end)
 
 local originalMaxSpread = {}
 local spreadTables = {}
+
 local function cacheSpreadTables()
     spreadTables = {}
     for _, obj in pairs(getgc(true)) do
@@ -850,19 +1133,38 @@ local function cacheSpreadTables()
         end
     end
 end
-local ToggleNoSpread = Main:AddToggle({ Name = "No Spread", Default = false })
+
+local ToggleNoSpread = Main:AddToggle({
+    Name = "No Spread",
+    Default = false
+})
+
 ToggleNoSpread:Callback(function(Value)
-    if #spreadTables == 0 then cacheSpreadTables() end
+    if #spreadTables == 0 then
+        cacheSpreadTables()
+    end
+
     if Value then
-        for _, obj in pairs(spreadTables) do obj.maxSpread = 0 end
+        for _, obj in pairs(spreadTables) do
+            obj.maxSpread = 0
+        end
     else
-        for _, obj in pairs(spreadTables) do if originalMaxSpread[obj] then obj.maxSpread = originalMaxSpread[obj] end end
+        for _, obj in pairs(spreadTables) do
+            if originalMaxSpread[obj] then
+                obj.maxSpread = originalMaxSpread[obj]
+            end
+        end
     end
 end)
 
-local ToggleNoRecoil = Main:AddToggle({ Name = "No Recoil", Default = false })
+local ToggleNoRecoil = Main:AddToggle({
+    Name = "No Recoil",
+    Default = false
+})
+
 local originalRecoilValues = {}
 local recoilTables = {}
+
 local function cacheRecoilTables()
     recoilTables = {}
     for _, v in pairs(getgc(true)) do
@@ -880,8 +1182,12 @@ local function cacheRecoilTables()
         end
     end
 end
+
 ToggleNoRecoil:Callback(function(Value)
-    if #recoilTables == 0 then cacheRecoilTables() end
+    if #recoilTables == 0 then
+        cacheRecoilTables()
+    end
+
     if Value then
         for _, v in pairs(recoilTables) do
             v.recoilAmount = 0
@@ -913,6 +1219,7 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 _G.AirdropAura = false
+
 local function ChmrPrompt()
     while _G.AirdropAura do
         local map = workspace:FindFirstChild("Map")
@@ -936,7 +1243,11 @@ local function ChmrPrompt()
     end
 end
 
-local Airdrop = Main:AddToggle({ Name = "Airdrop Aura", Default = false })
+local Airdrop = Main:AddToggle({
+    Name = "Airdrop Aura",
+    Default = false
+})
+
 Airdrop:Callback(function(Value)
     _G.AirdropAura = Value
     if _G.AirdropAura then
@@ -977,7 +1288,11 @@ local function monitorAirdrops()
     end
 end
 
-local AirdropNotifyToggle = Main:AddToggle({ Name = "Notify Airdrop", Default = false })
+local AirdropNotifyToggle = Main:AddToggle({
+    Name = "Notify Airdrop",
+    Default = false
+})
+
 AirdropNotifyToggle:Callback(function(Value)
     _G.NotifyAirdrop = Value
     if _G.NotifyAirdrop then
@@ -986,7 +1301,12 @@ AirdropNotifyToggle:Callback(function(Value)
 end)
 
 local buttonRespawnGuiElements = {}
-local ToggleButtonRespawn = Main:AddToggle({ Name = "Button Respawn", Default = false })
+
+local ToggleButtonRespawn = Main:AddToggle({
+    Name = "Button Respawn",
+    Default = false
+})
+
 ToggleButtonRespawn:Callback(function(Value)
     local tweenService = game:GetService("TweenService")
     local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -1090,6 +1410,14 @@ ToggleButtonRespawn:Callback(function(Value)
                 return pog(self, key)
             end)
 
+            local function getRemote(name)
+                for i, v in pairs(remotes) do
+                    if i.Name == name then
+                        return i
+                    end
+                end
+            end
+
             pcall(function()
                 for i = 1, 25 do
                     getRemote("StartFastRespawn"):FireServer()
@@ -1101,6 +1429,12 @@ ToggleButtonRespawn:Callback(function(Value)
             wait(0.1)
             chamada.TextColor3 = Color3.new(1, 1, 1)
         end)
+
+        local function updatePositions()
+            Fundo.Position = chamada.Position
+        end
+
+        chamada.Changed:Connect(updatePositions)
 
         animateTransparency(Fundo, 0)
         animateTextTransparency(chamada, 0)
@@ -1123,7 +1457,11 @@ ToggleButtonRespawn:Callback(function(Value)
     end
 end)
 
-local ToggleInstaFastRespawn = Main:AddToggle({ Name = "Insta Fast Respawn", Default = false })
+local ToggleInstaFastRespawn = Main:AddToggle({
+    Name = "Insta Fast Respawn",
+    Default = false
+})
+
 local Players = game:GetService('Players')
 local LocalPlayer = Players.LocalPlayer
 
