@@ -25,7 +25,7 @@ local antoralib = {
         }
     },
     Info = {
-        Version = "vai toma no cu redz9999"
+        Version = "ks3r"
     },
     Save = {
         UISize = {490, 300},
